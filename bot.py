@@ -48,15 +48,27 @@ def _autorizado(update: Update) -> bool:
 
 
 def _crear_driver():
+    """Crea Chrome headless con flags compatibles con contenedores Docker."""
     options = Options()
     options.binary_location = os.getenv("CHROME_BIN", "/usr/bin/chromium")
+
+    # Flags base
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
+    options.add_argument("--disable-setuid-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-features=VizDisplayCompositor")
     options.add_argument("--window-size=1366,900")
     options.add_argument("--ignore-certificate-errors")
+    # ⚠️ Estos 2 son los que suelen solucionar el crash en Render:
+    options.add_argument("--no-zygote")
+    options.add_argument("--single-process")
 
+    # Carpeta de descargas
     prefs = {
         "download.default_directory": str(DESCARGAS_DIR),
         "download.prompt_for_download": False,
@@ -70,6 +82,7 @@ def _crear_driver():
 
 
 def _esperar_descarga(carpeta: Path, timeout: int = 90) -> Path | None:
+    """Espera a que aparezca un .docx/.doc completamente descargado."""
     fin = time.time() + timeout
     while time.time() < fin:
         archivos = list(carpeta.glob("*.docx")) + list(carpeta.glob("*.doc"))
@@ -85,6 +98,7 @@ def _esperar_descarga(carpeta: Path, timeout: int = 90) -> Path | None:
 
 
 def _word_a_pdf(ruta_docx: Path, carpeta_salida: Path) -> Path | None:
+    """Convierte un .docx a .pdf usando LibreOffice headless."""
     comando = [
         "libreoffice", "--headless", "--invisible", "--norestore",
         "--convert-to", "pdf:writer_pdf_Export",
@@ -101,6 +115,7 @@ def _word_a_pdf(ruta_docx: Path, carpeta_salida: Path) -> Path | None:
 
 
 def _limpiar_carpeta(carpeta: Path):
+    """Borra todo el contenido de una carpeta."""
     for item in carpeta.iterdir():
         try:
             if item.is_file() or item.is_symlink():
@@ -111,8 +126,9 @@ def _limpiar_carpeta(carpeta: Path):
             print(f"No se pudo borrar {item}: {e}")
 
 
-# ---------- AUTOMATIZACIÓN ----------
+# ---------- AUTOMATIZACIÓN (síncrona, se ejecuta en un hilo) ----------
 def _automatizacion_sync(idcif_val: str, rfc_val: str) -> Path:
+    """Ejecuta el flujo completo y devuelve la ruta del PDF generado."""
     with PROCESO_LOCK:
         _limpiar_carpeta(DESCARGAS_DIR)
         _limpiar_carpeta(TEMP_DIR)
