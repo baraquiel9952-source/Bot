@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+temp/
+descargas/
+*.png
+*.pdf
+*.docx
+.venv/
+venv/
+.DS_Store
